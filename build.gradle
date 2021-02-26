@@ -1,0 +1,112 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'org.springframework.boot' version '2.3.1.RELEASE'
+    id 'io.spring.dependency-management' version '1.0.9.RELEASE'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    assessment {
+        java.srcDir 'assessment/java'
+        resources.srcDir 'assessment/resources'
+    }
+}
+
+// Ensure that any tests will use the new JUnit testing platform
+tasks.withType(Test) { useJUnitPlatform() }
+
+/*
+   TODO: modify so the Java language server recognizes this as a "test"
+
+   Until then, if VS Code complains about not finding `org.junit` then
+   add `<attribute name="test" value="true"/>` to the
+   `<classpathentry kind="src" output="bin/assessment" path="assessment/java">`
+   in the `.classpath` file. This will need to be done any time that the
+   project configuration is updated, typically when this file is changed.
+*/
+task assess(type: Test) {
+    description = 'Runs automated assessment.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.assessment.output.classesDirs
+    classpath = sourceSets.assessment.runtimeClasspath
+
+    testLogging {
+        // set options for log level LIFECYCLE
+        events "passed", "skipped", "failed"
+
+        showExceptions true
+        showCauses true
+        exceptionFormat "full"
+    }
+}
+
+jar {
+    archiveBaseName = "$project.name"
+    archiveVersion = '0.0.1-SNAPSHOT'
+}
+
+dependencies {
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.hamcrest:hamcrest-all:1.3'
+
+    assessmentImplementation sourceSets.main.output
+    assessmentImplementation configurations.testImplementation
+
+    assessmentRuntimeOnly configurations.testRuntimeOnly
+}
+
+test {
+    // Use junit platform for unit tests
+    useJUnitPlatform()
+
+    testLogging {
+        // set options for log level LIFECYCLE
+        events "passed", "skipped", "failed"
+
+        showExceptions true
+        showCauses false
+        exceptionFormat "full"
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+check.dependsOn(assess)  // ensure assess is run as part of the check lifecycle task
+assess.finalizedBy(test)
+
+test.finalizedBy(jacocoTestReport)
+jacocoTestReport.dependsOn(test)
+jacocoTestReport.finalizedBy(jacocoTestCoverageVerification)
+
+// The wrapper version should always be explicitly set here.
+//
+// This makes it very easy to see which version of Gradle is used.
+// It also ensures that all the wrapper scripts are updated in
+// addition to the jar and properties file.
+//
+// If you change ANY wrapper values you MUST run `gradle wrapper` and
+// add everything updated to the same commit.
+
+wrapper {
+    gradleVersion = '6.5'
+    distributionType = Wrapper.DistributionType.BIN
+}
